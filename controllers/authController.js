@@ -84,6 +84,19 @@ exports.login = catchAsync(async (req, res, next) => {
   createSendToken(user, 201, res);
 });
 
+// 로그아웃 후 로그아웃 시간 기록
+exports.logout = catchAsync(async (req, res, next) => {
+  req.user.logoutAt = Date.now() - 1000;
+
+  await req.user.save({ validateBeforeSave: false });
+
+  res.status(201).json({
+    status: "success",
+    message: "로그아웃 되었습니다.",
+  });
+});
+
+// 적합한 유저인지 확인
 exports.protect = catchAsync(async (req, res, next) => {
   let token;
   // 1) 토큰이 header에 존재하면 가져오기
@@ -105,7 +118,12 @@ exports.protect = catchAsync(async (req, res, next) => {
   const currentUser = await User.findById(decoded.id);
   if (!currentUser) return next(new AppError("유저가 존재하지 않습니다."));
 
-  // 4) 유저가 토큰을 발행 후 비밀번호를 바꿔는지 확인
+  // 4) 유저가 로그아웃 전에 받은 토큰인지 확인
+  if (currentUser.logoutAfterCompare(decoded.iat)) {
+    return next(new AppError("로그인 해주세요", 401));
+  }
+
+  // 5) 유저가 토큰을 발행 후 비밀번호를 바꿔는지 확인
   if (currentUser.changedPasswordAfter(decoded.iat))
     return next(
       new AppError("최근에 비밀번호를 바꾸었습니다. 다시 로그인 해주세요.", 401)

@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema({
   passwordChangeAt: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
+  logoutAt: Date,
 });
 
 // 비밀번호가 바뀌었을 시 실행, 패스워드 확인 삭제
@@ -60,6 +61,21 @@ userSchema.methods.correctPassword = async function(
   userPassword
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+// 로그아웃 후 생성 된 토큰인지 확인
+userSchema.methods.logoutAfterCompare = function(JWTTimeStamp) {
+  //로그아웃 전에 받은 토큰인지 체크, 토큰 생성 시간 < 로그아웃 시간 => 옳지 않은 토큰
+  if (this.logoutAt) {
+    const changedTimeStamp = parseInt(
+      this.passwordChangeAt.getTime() / 1000,
+      10
+    );
+    return JWTTimeStamp < changedTimeStamp;
+  }
+
+  // 로그아웃 후에 받은 토큰임
+  return false;
 };
 
 // 비밀번호 변경 후 생성 된 토큰인지 확인
